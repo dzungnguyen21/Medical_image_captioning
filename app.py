@@ -1,166 +1,151 @@
 import streamlit as st
 from PIL import Image
-import io
-import base64
+from models import MODELS
+from transformers import pipeline
 
-# Cấu hình trang
+# --- PAGE CONFIG ---
 st.set_page_config(
-    page_title="Medical Image Captioning",
+    page_title="Image Captioning",
     page_icon="🏥",
-    layout="wide"
 )
 
-# CSS tùy chỉnh
+# --- CSS ---
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        text-align: center;
-        color: #1f77b4;
-        margin-bottom: 2rem;
-    }
-    .stButton>button {
-        width: 100%;
-        background-color: #1f77b4;
-        color: white;
-    }
-    .chat-message {
-        padding: 1.5rem;
-        border-radius: 0.5rem;
-        margin-bottom: 1rem;
-        display: flex;
-        flex-direction: column;
-    }
-    .user-message {
-        background-color: #e3f2fd;
-        margin-left: 20%;
-    }
-    .bot-message {
-        background-color: #f5f5f5;
-        margin-right: 20%;
-    }
+body { background-color: #fafafa; }
+
+.title {
+    text-align: center;
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: #1f77b4;
+    margin-bottom: 0.2rem;
+}
+
+.subtitle {
+    text-align: center;
+    font-size: 1rem;
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+.start-container {
+    max-width: 450px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.stButton>button {
+    background-color: #1f77b4 !important;
+    color: white !important;
+    border-radius: 8px !important;
+    height: 3rem !important;
+    font-size: 1.1rem !important;
+}
+
+.result-text {
+    max-width: 400px;
+    font-size: 1.1rem;
+}
+
+.footer {
+    text-align: center;
+    color: gray;
+    margin-top: 3rem;
+    font-size: 0.9rem;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# Khởi tạo session state
-if 'chat_history' not in st.session_state:
-    st.session_state.chat_history = []
-if 'current_image' not in st.session_state:
-    st.session_state.current_image = None
+# --- SESSION STATE ---
+if "image_uploaded" not in st.session_state:
+    st.session_state.image_uploaded = None
+if "caption" not in st.session_state:
+    st.session_state.caption = None
+if "model_selected" not in st.session_state:
+    st.session_state.model_selected = list(MODELS.keys())[0]
 
-# Hàm giả lập tạo caption (bạn có thể thay thế bằng model thực tế)
-def generate_caption(image, model_name):
-    """
-    Hàm này sẽ được thay thế bằng model thực tế
-    """
-    captions = {
-        "BLIP": f"A medical image showing anatomical structures. Model: {model_name}",
-        "ViT-GPT2": f"This appears to be a diagnostic medical scan with various features. Model: {model_name}",
-        "CheXNet": f"Medical imaging study demonstrating clinical findings. Model: {model_name}",
-        "Custom Model": f"Image analysis complete using {model_name}."
-    }
-    return captions.get(model_name, "Unable to generate caption for this image.")
 
-# Header
-st.markdown('<div class="main-header">🏥 Medical Image Captioning Chatbot</div>', unsafe_allow_html=True)
+# --- MODEL LOADING ---
+@st.cache_resource
+def load_hf_model(model_key):
+    hf_name = MODELS[model_key]["hf_name"]
+    if hf_name is None:
+        return None
+    return pipeline("image-to-text", model=hf_name, trust_remote_code=True)
 
-# Sidebar - Model selection
-with st.sidebar:
-    st.header("⚙️ Cài đặt")
-    
-    selected_model = st.selectbox(
-        "Chọn mô hình:",
-        ["BLIP", "ViT-GPT2", "CheXNet", "Custom Model"],
-        index=0
-    )
-    
-    st.markdown("---")
-    st.markdown("### Thông tin mô hình")
-    
-    model_info = {
-        "BLIP": "Bootstrapping Language-Image Pre-training - Model đa năng cho image captioning",
-        "ViT-GPT2": "Vision Transformer kết hợp GPT-2 - Tạo mô tả chi tiết",
-        "CheXNet": "Chuyên về phân tích X-quang ngực",
-        "Custom Model": "Mô hình tùy chỉnh của bạn"
-    }
-    
-    st.info(model_info[selected_model])
-    
-    st.markdown("---")
-    if st.button("🗑️ Xóa lịch sử chat"):
-        st.session_state.chat_history = []
-        st.session_state.current_image = None
-        st.rerun()
 
-# Khu vực chat history
-chat_container = st.container()
+def generate_caption(image, model_key):
+    model = load_hf_model(model_key)
+    if model is None:
+        return f"(Model '{model_key}' chưa được triển khai.)"
+    try:
+        result = model(image)
+        return result[0]["generated_text"]
+    except Exception as e:
+        return f"Model error: {e}"
 
-with chat_container:
-    if st.session_state.chat_history:
-        for message in st.session_state.chat_history:
-            if message['type'] == 'user':
-                st.markdown(f'<div class="chat-message user-message"><b>👤 Bạn:</b><br/>{message["content"]}</div>', unsafe_allow_html=True)
-                if message.get('image'):
-                    st.image(message['image'], width=300)
-            else:
-                st.markdown(f'<div class="chat-message bot-message"><b>🤖 Bot ({message.get("model", "Unknown")}):</b><br/>{message["content"]}</div>', unsafe_allow_html=True)
-    else:
-        st.info("👋 Xin chào! Tôi là chatbot image captioning. Hãy tải ảnh và tôi sẽ tạo mô tả cho bạn.")
 
-# Khu vực input ở dưới cùng
-st.markdown("---")
-st.markdown("### 📤 Tải ảnh và gửi")
+# --- HEADER ---
+st.markdown("<div class='title'>Image Captioning</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>Upload an image and see what the model thinks it is</div>", unsafe_allow_html=True)
 
-# Tạo 3 cột: nút chọn model, upload file, nút enter
-col1, col2, col3 = st.columns([2, 6, 1])
 
-with col1:
-    st.markdown(f"**Mô hình:** {selected_model}")
+# --- START SCREEN ---
+def start_screen():
+    st.set_page_config(layout="centered")
+    with st.container(horizontal_alignment="center"):
+        st.session_state.model_selected = st.selectbox(
+            "Select model",
+            list(MODELS.keys()),
+            index=list(MODELS.keys()).index(st.session_state.model_selected)
+        )
+        st.info(MODELS[st.session_state.model_selected]["description"])
 
-with col2:
-    uploaded_file = st.file_uploader(
-        "Chọn ảnh y tế",
-        type=['png', 'jpg', 'jpeg', 'bmp', 'dicom'],
-        key="image_uploader",
-        label_visibility="collapsed"
-    )
+        uploaded_file = st.file_uploader("Upload an image", type=["png","jpg","jpeg","bmp"])
+        if uploaded_file:
+            st.session_state.image_uploaded = Image.open(uploaded_file)
+            st.session_state.caption = "thinking..."
+            st.rerun()
 
-with col3:
-    submit_button = st.button("➡️", help="Gửi ảnh để tạo caption")
 
-# Xử lý khi người dùng gửi ảnh
-if submit_button and uploaded_file is not None:
-    # Đọc ảnh
-    image = Image.open(uploaded_file)
-    st.session_state.current_image = image
-    
-    # Thêm tin nhắn của user vào chat history
-    st.session_state.chat_history.append({
-        'type': 'user',
-        'content': f'Đã tải lên ảnh: {uploaded_file.name}',
-        'image': image
-    })
-    
-    # Tạo caption
-    with st.spinner(f'Đang phân tích ảnh với mô hình {selected_model}...'):
-        caption = generate_caption(image, selected_model)
-    
-    # Thêm phản hồi của bot
-    st.session_state.chat_history.append({
-        'type': 'bot',
-        'content': caption,
-        'model': selected_model
-    })
-    
-    st.rerun()
+# --- RESULT SCREEN ---
+def result_screen():
+    st.set_page_config(layout="wide")
+    image = st.session_state.image_uploaded
+    model_name = st.session_state.model_selected
 
-elif submit_button and uploaded_file is None:
-    st.warning("⚠️ Vui lòng chọn một ảnh trước khi gửi!")
+    col1, col2, col3 = st.columns([3, 1, 3], vertical_alignment="center")
 
-# Footer
-st.markdown("---")
-st.markdown(
-    "<div style='text-align: center; color: gray;'>Medical Image Captioning Chatbot v1.0 | Powered by Streamlit</div>",
-    unsafe_allow_html=True
-)
+    with col1:
+        st.image(image, caption="Uploaded Image")
+
+    with col2:
+        st.markdown('<div style="font-size: 3rem; text-align: center">➡️</div>', unsafe_allow_html=True)
+
+    with col3:
+        if st.session_state.caption == "thinking...":
+            with st.spinner("Model is thinking..."):
+                st.session_state.caption = generate_caption(image, model_name)
+        st.markdown(f"<div class='result-text'><b style='font-size: 2rem'>{model_name} thinks it is...</b><br>{st.session_state.caption}</div>", unsafe_allow_html=True)
+
+    # Buttons
+    button_container = st.container(horizontal_alignment="center")
+    with button_container:
+        if st.button("Try another image"):
+            st.session_state.image_uploaded = None
+            st.session_state.caption = None
+            st.rerun()
+
+# --- MAIN FLOW ---
+
+
+if st.session_state.image_uploaded is None:
+    start_screen()
+else:
+    result_screen()
+
+
+# --- FOOTER ---
+st.markdown("<div class='footer'>Medical Image Captioning v1.0 | Powered by Streamlit</div>", unsafe_allow_html=True)
+
