@@ -27,6 +27,9 @@ wheels/
 venv/
 ENV/
 env/
+imgcap
+imgcapreal
+imgcapreal310
 
 # IDE
 .vscode/
