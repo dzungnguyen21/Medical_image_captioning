@@ -24,7 +24,7 @@ class BaseModel:
 # 2. BLIP Base
 # ==========================================
 class BLIPBaseModel(BaseModel):
-    description = "BLIP Base"
+    description = "Great for fast inference on general images"
     requires_prompt = False
 
     def __init__(self):
@@ -42,7 +42,7 @@ class BLIPBaseModel(BaseModel):
 # 3. BLIP Large
 # ==========================================
 class BLIPLargeModel(BaseModel):
-    description = "BLIP Large"
+    description = "Get more detailed than BLIP Base"
     requires_prompt = False
 
     def __init__(self):
@@ -60,7 +60,7 @@ class BLIPLargeModel(BaseModel):
 # 4. Qwen2-VL (7B Instruct)
 # ==========================================
 class QwenVLModel(BaseModel):
-    description = "Qwen2-VL-7B"
+    description = "Great for getting detailed captions on general images"
     requires_prompt = True
 
     def __init__(self, model_id="Qwen/Qwen2-VL-7B-Instruct"):
@@ -105,7 +105,7 @@ class QwenVLModel(BaseModel):
 # 5. MedGemma 4B
 # ==========================================
 class MedGemmaModel(BaseModel):
-    description = "MedGemma-4B"
+    description = "Analyse medical images."
     requires_prompt = True
 
     def __init__(self, model_id="google/medgemma-4b-it"):
